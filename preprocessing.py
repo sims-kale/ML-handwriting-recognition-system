@@ -2,12 +2,12 @@ import cv2
 import os
 import matplotlib.pyplot as plt
 
-def process_image(dataset_path):
+def preprocess_images(dataset_path):
 
     # IMAGE PRE_PROCESSING
 
     try:    
-        images = []  # List to store images
+        process_images = []  # List to store images
 
         for image_name in sorted(os.listdir(dataset_path)):
             image_path = os.path.join(dataset_path, image_name)
@@ -20,20 +20,23 @@ def process_image(dataset_path):
                 resized_image = cv2.resize(grayscale_image, (255, 255))  # Resize image
                 blurred_image = cv2.GaussianBlur(resized_image, (1, 1), 0)   #gaussian Blur
                 _, binarized_image = cv2.threshold(blurred_image, 80, 220, cv2.THRESH_BINARY_INV)
-                images.append(binarized_image)
+                process_images.append(binarized_image)
 
         # Display images in 3x3 grid using subplots
         f, axes = plt.subplots(3, 5, figsize=(7, 7))
 
         for i, ax in enumerate(axes.flatten()):
-            ax.imshow(images[i], cmap='gray')
+            ax.imshow(process_images[i], cmap='gray')
             ax.axis('off')
 
         plt.show()
 
-        return binarized_image
+        return process_images
+
     except Exception as e:
         print(f"Error occurred in image preprocessing: {str(e)}")
+
+    
 
 def process_video(dataset_path):
     
