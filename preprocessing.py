@@ -14,13 +14,16 @@ def preprocess_images(dataset_path):
 
             if image_name.endswith('.png'):  # Ensure only images are processed not .avi 
                 image = cv2.imread(image_path)
+                # print(f"Min pixel value: {image.min()}, Max pixel value: {image.max()}")
                 rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
-                grayscale_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2HSV)   # Gray Scale image
-                grayscale_image = grayscale_image[:,:,2]
+                grayscale_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
+
                 resized_image = cv2.resize(grayscale_image, (255, 255))  # Resize image
                 blurred_image = cv2.GaussianBlur(resized_image, (1, 1), 0)   #gaussian Blur
                 _, binarized_image = cv2.threshold(blurred_image, 80, 220, cv2.THRESH_BINARY_INV)
-                process_images.append(binarized_image)
+                normalized_image = binarized_image / 255.0
+                print(f"Min pixel value: {normalized_image.min()}, Max pixel value: {normalized_image.max()}")
+                process_images.append(normalized_image)
 
         # Display images in 3x3 grid using subplots
         f, axes = plt.subplots(3, 5, figsize=(7, 7))
