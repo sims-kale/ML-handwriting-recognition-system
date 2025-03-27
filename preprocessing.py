@@ -4,12 +4,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-
-
 def preprocess_images(image_paths):
-    all_digits = []  # List to store digits for each image
-    for image_path in image_paths:
-        raw_image = cv2.imread(image_path)
+        all_digits = []  # List to store digits for each image
+        print(f"Processing image: {image_paths}")
+        raw_image = cv2.imread(image_paths)
         resized_image = cv2.resize(raw_image, (580, 580), interpolation=cv2.INTER_AREA)
         cv2.imshow("Image", resized_image)
         cv2.waitKey(0)
@@ -47,11 +45,11 @@ def preprocess_images(image_paths):
         cv2.imshow("Lines Removed", thresholded_image)
         cv2.waitKey(0)
 
-        line_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (40,1 ))
-        detected_lines = cv2.morphologyEx(thresholded_image, cv2.MORPH_OPEN, line_kernel, iterations=1)
-        cnts_lines, _ = cv2.findContours(detected_lines, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        for c in cnts_lines:
-            cv2.drawContours(thresholded_image, [c], -1, (0, 0, 0), thickness=cv2.FILLED)
+        # line_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (40,1 ))
+        # detected_lines = cv2.morphologyEx(thresholded_image, cv2.MORPH_OPEN, line_kernel, iterations=1)
+        # cnts_lines, _ = cv2.findContours(detected_lines, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # for c in cnts_lines:
+        #     cv2.drawContours(thresholded_image, [c], -1, (0, 0, 0), thickness=cv2.FILLED)
 
          # Optional: Apply a slight erosion to separate merged digits
         # kernel_small = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
@@ -94,7 +92,7 @@ def preprocess_images(image_paths):
             plt.axis("off")
         plt.show()
 
-    return all_digits
+        return all_digits
 
 def make_mnist_size(image, size=28):
     h, w = image.shape

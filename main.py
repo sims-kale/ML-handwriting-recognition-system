@@ -2,32 +2,41 @@
 
 import os
 from preprocessing import preprocess_images, process_video
-from feature_extrcation import extract_features, visualize_features, extract_video_features
+from pre_processFunctions import custom_processes, process_and_extract_digits
+# from feature_extrcation
 import numpy as np
 
 def main():
     dataset_path = r'D:\SHU\ML_lab\Assesment\Number_Test_Data'
     all_images = [img for img in os.listdir(dataset_path) if img.endswith(".png")]
-    image_paths = [os.path.join(dataset_path, img) for img in all_images[13:14]]
-    print(image_paths)
-
-    preprocessed_images = preprocess_images(image_paths)
-    print(preprocessed_images)
-    # hog_features, hog_images, edges_images = extract_features(preprocessed_images)
-    # # Step 4: Convert Features to NumPy Array
-    # hog_features = np.array(hog_features)  # Ensure correct format
-    # labels = np.arange(len(hog_features))  # Generate dummy labels (Replace with actual labels if available)
-    # visualize_features(preprocessed_images, hog_images, edges_images)
-
-
-    #Video 
-    # process_video(dataset_path)
-    # extract_video_features()
-    
+    image_path = [os.path.join(dataset_path, img_path) for img_path in all_images[13:14]]
+    print(image_path)
+    all_digits = []
+    image_name  = [os.path.basename(path) for path in image_path]
+    print(image_name)
     
 
+    if '013.png' in image_name:
+        print("Processing image 14 with custom process")
+        process = custom_processes["image_14"]
 
-    # process_video(dataset_path)
+    else:
+        process = custom_processes["default"]
+
+    # Process image and extract digits
+    digits = process_and_extract_digits(image_path, process)
+    # preprocessed_images = preprocess_images(img_path)
+
+    if digits:
+        all_digits.append(digits)  # Store extracted digits
+
+    print("Processing complete.")
+    return all_digits
+
+
+    
+    # print(preprocessed_images)
+
 
 if __name__ == "__main__":
     main()
