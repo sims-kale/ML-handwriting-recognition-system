@@ -5,7 +5,19 @@ import numpy as np
 
 
 # Load, resize and grayscale the images
-def load_resized_images(image):
+
+def zero_nine_images(image, **kwargs):
+    image = cv2.imread(image)  # Load the image
+    if image is None:
+        raise ValueError(f"Unable to load image: {image}")
+    print(f"Loaded image shape: {image.shape}")  # Print the shape of the raw image
+    return image  # Return the raw image
+
+def load_images(image):
+    image = cv2.imread(image)
+    return image
+
+def resized_images(image):
     resized_image = cv2.resize(image, (580, 580), interpolation=cv2.INTER_AREA)
 
     gray_image = cv2.cvtColor(resized_image, cv2.COLOR_BGR2GRAY)
@@ -17,44 +29,56 @@ def load_resized_images(image):
 
 def enhance_contrast(image, clip_limit=2.0):
     # Apply CLAHE for contrast enhancement
-    clahe = cv2.createCLAHE(clip_limit, tileGridSize=(10, 10))
+    clahe = cv2.createCLAHE(clip_limit, tileGridSize=(11, 11))
     enhanced_image = clahe.apply(image)
     cv2.imshow("Enhanced Image", enhanced_image)
     cv2.waitKey(0)
     return enhanced_image
 
 
-def apply_threshold(image, method="14_binary"):
+def apply_threshold(image, method, threshold):
     """Apply either binary or adaptive thresholding."""
-    if method == "14_binary":
-        _, bin_img = cv2.threshold(image, 85, 225, cv2.THRESH_BINARY_INV)
+    print(f"Applying thresholding method: {method}, threshold: {threshold}")
+    if method == "13_binary":
+        _, bin_img = cv2.threshold(image, threshold, 225, cv2.THRESH_BINARY_INV)
     elif method == "adaptive":
         bin_img = cv2.adaptiveThreshold(
             image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 25, 12
         )
     else:
         bin_img = image
+
+    cv2.imshow("Thresholded Image", bin_img)
+    cv2.waitKey(0)
     return bin_img
 
 
 # Detect and remove lines using Hough Line Transform
-def remove_lines(thresholded_image, apply_line_removal=True):
-    if not apply_line_removal:
-        return thresholded_image
-    lines = cv2.HoughLinesP(
-        thresholded_image, 1, np.pi / 180, 100, minLineLength=30, maxLineGap=19.5
-    )
-    if lines is not None:
-        for line in lines:
-            x1, y1, x2, y2 = line[0]
-            cv2.line(thresholded_image, (x1, y1), (x2, y2), (0, 0, 0), 2)
+def remove_lines(thresholded_image, method):
+
+    if method == "houghLine":
+        lines = cv2.HoughLinesP(
+            thresholded_image, 1, np.pi / 180, 100, minLineLength=5, maxLineGap=90
+        )
+        mask = np.zeros_like(thresholded_image)
+        if lines is not None:
+            for line in lines:
+                x1, y1, x2, y2 = line[0]
+                cv2.line(mask, (x1, y1), (x2, y2), (255), 2)
+        thresholded_image = cv2.inpaint(thresholded_image, mask, 3, cv2.INPAINT_TELEA)
+
+
+        
+    
+    elif method == "kernelLine":
+        line_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (40,1 ))
+        detected_lines = cv2.morphologyEx(thresholded_image, cv2.MORPH_OPEN, line_kernel, iterations=1)
+        cnts_lines, _ = cv2.findContours(detected_lines, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for c in cnts_lines:
+            cv2.drawContours(thresholded_image, [c], -1, (0) -1)
+
     cv2.imshow("Lines Removed", thresholded_image)
     cv2.waitKey(0)
-    # line_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (40,1 ))
-    # detected_lines = cv2.morphologyEx(thresholded_image, cv2.MORPH_OPEN, line_kernel, iterations=1)
-    # cnts_lines, _ = cv2.findContours(detected_lines, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    # for c in cnts_lines:
-    #     cv2.drawContours(thresholded_image, [c], -1, (0, 0, 0), thickness=cv2.FILLED)
     return thresholded_image
 
 
@@ -68,152 +92,130 @@ def apply_erosion_dilation(thresholded_image):
 
 
 # extract digits from images
-def extract_digits(erosion_image):
+def extract_digits(thresholded_image, area):
     # Debug: Visualize contours
     contours, _ = cv2.findContours(
-        erosion_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        thresholded_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
     )
-    debug_image = cv2.cvtColor(erosion_image.copy(), cv2.COLOR_GRAY2BGR)
-    bounding_boxes = []
+    # debug_image = cv2.cvtColor(thresholded_image.copy(), cv2.COLOR_GRAY2BGR)
+   
     for c in contours:
-        x, y, w, h = cv2.boundingRect(c)
-        # area = cv2.contourArea(c)
+        
         # Filter out too-small or too-large bounding boxes
-        if w < 3 or h < 10 or w > 200 or h > 200:
-            continue
-        bounding_boxes.append((x, y, w, h))
-        cv2.rectangle(debug_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-    cv2.imshow("Bounding Boxes", debug_image)
-    cv2.waitKey(0)
+        areas = cv2.contourArea(c)        
+        if areas < area:
+            cv2.drawContours(thresholded_image, [c], -1, (0), -1)
+        countors = [c for c in contours if cv2.contourArea(c) > area]   
 
-    # Sort by y first (for multiple rows) then x (for left-to-right)
-    bounding_boxes = sorted(
-        bounding_boxes, 
-        key=lambda b: (round((b[1] + b[3] / 2) / 30), b[0] + b[2] / 2)
-    )
+
+
+        # Sort by y first (for multiple rows) then x (for left-to-right)
+        countors.sort(key=lambda x: cv2.boundingRect(x)[0])
+        
+        # bounding_boxes = sorted(
+        #     bounding_boxes, 
+        #     key=lambda b: (round((b[1] + b[3] / 2) / 30), b[0] + b[2] / 2)
+        # )
+    
+    # Draw green bounding boxes for visualization
+    debug_image = cv2.cvtColor(thresholded_image.copy(), cv2.COLOR_GRAY2BGR)
+    for cnt in countors:
+        x, y, w, h = cv2.boundingRect(cnt)
+        cv2.rectangle(debug_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+    
+    cv2.imshow("Detected Green Boxes", debug_image)
+    cv2.waitKey(0)
+    
+
+
+
 
     digits = []
-    for x, y, w, h in bounding_boxes:
-        digit_roi = erosion_image[y : y + h, x : x + w]
-        digits_roi = cv2.resize(digit_roi, (28, 28)) # Resize to 28x28
-        digit_roi = digits_roi.astype(np.float32) / 255.0 # Normalize to 0-1 range
+    for cnt in countors:
+        x, y, w, h = cv2.boundingRect(cnt)
+        padding = 5
+        x_start = max(0, x - padding)
+        y_start = max(0, y - padding)
+        x_end = min(thresholded_image.shape[1], x + w + padding)
+        y_end = min(thresholded_image.shape[0], y + h + padding)
+
+        digit_roi = thresholded_image[y_start:y_end, x_start:x_end]
+        digit_roi = cv2.resize(digit_roi, (28, 28), interpolation= cv2.INTER_AREA) # Resize to 28x28
+        # digit_roi = digits_roi.astype(np.float32) / 255.0 # Normalize to 0-1 range
         # digit_roi = cv2.GaussianBlur(digit_roi, (3, 3), 0)  #gaussian blur
 
         digits.append(digit_roi)
 
     # Display digits for this image
-    for digit_img in digits:
-        cv2.imshow("Digit", digit_img)
-        cv2.waitKey(0)
+    # for digit_img in digits:
+    #     plt.imshow(digit_img, cmap="gray")
+    #     plt.axis("on")
+    #     plt.show()
 
     plt.figure(figsize=(10, 2))
     for i, digit_image in enumerate(digits):
         plt.subplot(1, len(digits), i + 1)
         plt.imshow(digit_image, cmap="gray")
-        plt.axis("off")
+        plt.axis("on")
     plt.show()
     return digits
-
-
-# def make_mnist_size(image, size=28):
-#     h, w = image.shape
-#     if h > w:
-#         new_h = 20
-#         new_w = int(round(w * 20.0 / h))
-#     else:
-#         new_w = 20
-#         new_h = int(round(h * 20.0 / w))
-#     resized_image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
-#     canvas = np.zeros((28, 28), dtype=np.uint8)
-#     x_offset = (28 - new_w) // 2
-#     y_offset = (28 - new_h) // 2
-#     canvas[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = resized_image
-#     canvas = shift_to_center_of_mass(canvas)
-#     return canvas
-
-
-# def shift_to_center_of_mass(image):
-#     m = cv2.moments(image)
-#     if m["m00"] == 0:
-#         return image
-#     c_x = int(m["m10"] / m["m00"])
-#     c_y = int(m["m01"] / m["m00"])
-#     shift_x = 14 - c_x
-#     shift_y = 14 - c_y
-#     M = np.float32([[1, 0, shift_x], [0, 1, shift_y]])
-#     shifted = cv2.warpAffine(image, M, (28, 28), borderValue=0)
-#     return shifted
-
-
-# def preprocess_images(image_paths):
-#     all_digits = []  # List to store digits for each image
-#     for image in image_paths:
-#         # Load, resize and grayscale the images
-#         gray_image = load_resized_images(image)
-#         # Apply contrast enhancement
-#         enhanced_image = enhance_contrast(gray_image)
-#         # Apply thresholding
-#         thresholded_image = apply_threshold(enhanced_image, method="14_binary")
-#         cv2.imshow("Thresholded Image", thresholded_image)
-#         cv2.waitKey(0)
-#         # Remove lines using Hough Line Transform
-#         thresholded_image = remove_lines(thresholded_image)
-#         erosion_image = apply_erosion_dilation(thresholded_image)
-#         # Extract digits from the image
-#         digit_images = extract_digits(erosion_image)
-#         all_digits.append(digit_images)
-
-#     return all_digits
 
 def process_image(image, pipeline):
     """Run a series of processing steps defined by the pipeline on an image."""
     try:
-        
         print(f"Processing image: {image}")
-        image = cv2.imread(image)
+        
         if image is None:
             raise ValueError(f"Unable to load image: {image}")
+        
         for step in pipeline:
             func = step["func"]
             kwargs = step.get("kwargs", {})
+            print(f"Running step: {func.__name__} with kwargs: {kwargs}")
+            image = func(image, **kwargs)
+        
+        return image
+    except Exception as e:
+        print(f"Error processing image {image}: {e}")
+    
+
+def process_and_extract_digits(image, pipeline):
+    """Process the image with the given pipeline and extract digit regions."""
+    try:
+        for step in pipeline:
+            func = step["func"]
+            kwargs = step.get("kwargs", {})
+            print(f"Running step: {func.__name__} with kwargs: {kwargs}")
             image = func(image, **kwargs)
         return image
     except Exception as e:
         print(f"Error processing image {image}: {e}")
         return None
 
-def process_and_extract_digits(image_path, pipeline):
-    """Process the image with the given pipeline and extract digit regions."""
-    for image in image_path:
-        processed_image = process_image(image, pipeline)
-        if processed_image is not None:
-            # Optionally display the processed image
-            plt.figure(figsize=(6,6))
-            plt.imshow(processed_image, cmap="gray")
-            plt.axis("off")
-            # plt.title(f"Processed: {os.path.basename(image_path)}")
-            plt.show()
-            digits = extract_digits(processed_image)
-            return digits
-        else:
-            return None
-
 # Define custom pipelines (using your file structure and code logic)
 custom_processes= {
-    "default": [
-        {"func": load_resized_images, "kwargs": {}},
-        {"func": enhance_contrast, "kwargs": {"clip_limit": 2.0}},
-        {"func": apply_threshold, "kwargs": {"method": "adaptive"}},
-        {"func": remove_lines, "kwargs": {"apply_line_removal": False}},
+    "image_0_9": [
+        {"func": zero_nine_images, "kwargs": {}},  # Ensure this points to a valid function
+    ],
+    "image_13": [
+        {"func": load_images, "kwargs": {}},
+        {"func": resized_images, "kwargs": {}},
+        # {"func": enhance_contrast, "kwargs": {"clip_limit": 2.0}},
+        {"func": apply_threshold, "kwargs": {"method": "13_binary","threshold" : 85}},
+        {"func": remove_lines, "kwargs": {"method": "houghLine"}},
+        {"func": apply_erosion_dilation, "kwargs": {}},
+        {"func": extract_digits, "kwargs": {"area": 30}},
+        
     ],
     "image_14": [
-        {"func": load_resized_images, "kwargs": {}},
-        {"func": enhance_contrast, "kwargs": {"clip_limit": 2.0}},
-        {"func": apply_threshold, "kwargs": {"method": "14_binary"}},
-        {"func": remove_lines, "kwargs": {"apply_line_removal": True}},
+        {"func": load_images, "kwargs": {}},
+        {"func": resized_images, "kwargs": {}},
+        {"func": apply_threshold, "kwargs": {"method": "adaptive", "threshold" : 40}},
+        {"func": remove_lines, "kwargs": {"method": "houghLine"}},
         {"func": apply_erosion_dilation, "kwargs": {}},
+        {"func": extract_digits, "kwargs": {"area": 70}},
 
-        {"func": extract_digits, "kwargs": {}},  # Assuming this function returns the digits
+        # {"func": extract_digits, "kwargs": {}},  # Assuming this function returns the digits
         
     ],
 }
