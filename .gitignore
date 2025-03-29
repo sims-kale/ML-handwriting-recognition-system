@@ -1,2 +1,4 @@
 /training_dataset/
 /archive.zip
+/ml_ocr/
+/mnist_model.h5
