@@ -25,4 +25,4 @@ These resources have been invaluable for testing different approaches and refini
 ## Results
 The notebook demonstrates the model's performance through training metrics and visualizations, showcasing the effectiveness of the CNN & ResNet for digit recognition.
 
-Enjoy exploring the project!
+Enjoy exploring the project!🥂
